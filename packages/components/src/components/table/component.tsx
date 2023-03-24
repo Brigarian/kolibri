@@ -17,17 +17,17 @@ import { emptyStringByArrayHandler, objectObjectHandler, parseJson, setState, wa
 import { KoliBriPaginationButtonCallbacks } from '../pagination/types';
 import { translate } from '../../i18n';
 
-type KoliBriTableHeaderCellAndData = KoliBriTableHeaderCell & {
-	data: KoliBriDataType;
+type KoliBriTableHeaderCellAndData<T> = KoliBriTableHeaderCell<T> & {
+	data: T;
 };
 
 /**
  * API
  */
-type RequiredProps = {
+type RequiredProps<T> = {
 	caption: string;
-	data: Stringified<KoliBriDataType[]>;
-	headers: Stringified<KoliBriTableHeaders>;
+	data: Stringified<T[]>;
+	headers: Stringified<KoliBriTableHeaders<T>>;
 };
 type OptionalProps = {
 	minWidth: string;
@@ -35,19 +35,19 @@ type OptionalProps = {
 };
 // type Props = Generic.Element.Members<RequiredProps, OptionalProps>;
 
-type RequiredStates = {
+type RequiredStates<T> = {
 	caption: string;
-	data: KoliBriDataType[];
-	headers: KoliBriTableHeaders;
+	data: T[];
+	headers: KoliBriTableHeaders<T>;
 	pagination: KoliBriTablePaginationStates;
-	sortedData: KoliBriDataType[];
+	sortedData: T[];
 };
 type OptionalStates = {
 	minWidth: string;
 } & {
 	sortDirection: KoliBriSortDirection;
 };
-type States = Generic.Element.Members<RequiredStates, OptionalStates>;
+type States<T> = Generic.Element.Members<RequiredStates<T>, OptionalStates>;
 
 const PAGINATION_OPTIONS = [10, 20, 50, 100];
 
@@ -60,11 +60,11 @@ const CELL_REFS = new Map<HTMLElement, ReturnType<typeof setTimeout>>();
 	},
 	shadow: true,
 })
-export class KolTable implements Generic.Element.ComponentApi<RequiredProps, OptionalProps, RequiredStates, OptionalStates> {
+export class KolTable<T extends KoliBriDataType> implements Generic.Element.ComponentApi<RequiredProps<T>, OptionalProps, RequiredStates<T>, OptionalStates> {
 	// https://github.com/ionic-team/stencil/issues/2895
 	private horizontal = true;
-	private sortFunction?: KoliBriSortFunction;
-	private sortDirections: Map<KoliBriSortFunction, KoliBriSortDirection> = new Map();
+	private sortFunction?: KoliBriSortFunction<T>;
+	private sortDirections: Map<KoliBriSortFunction<T>, KoliBriSortDirection> = new Map();
 	private showPagination = false;
 	private pageStartSlice = 0;
 	private pageEndSlice = 10;
@@ -77,12 +77,12 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 	/**
 	 * Gibt die Daten an, die für die Erstellung der Tabelle verwendet werden.
 	 */
-	@Prop() public _data!: Stringified<KoliBriDataType[]>;
+	@Prop() public _data!: Stringified<T[]>;
 
 	/**
 	 * Gibt die horizontalen und vertikalen Header für die Tabelle an.
 	 */
-	@Prop() public _headers!: Stringified<KoliBriTableHeaders>;
+	@Prop() public _headers!: Stringified<KoliBriTableHeaders<T>>;
 
 	/**
 	 * Gibt an, die minimale Breite der Tabelle an.
@@ -97,7 +97,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 	/**
 	 * @see: components/abbr/component.tsx (@State)
 	 */
-	@State() public state: States = {
+	@State() public state: States<T> = {
 		_caption: '…', // ⚠ required
 		_data: [],
 		_headers: {
@@ -126,19 +126,19 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 	 * @see: components/abbr/component.tsx (@Watch)
 	 */
 	@Watch('_data')
-	public validateData(value?: Stringified<KoliBriDataType[]>): void {
+	public validateData(value?: Stringified<T[]>): void {
 		emptyStringByArrayHandler(value, () => {
 			objectObjectHandler(value, () => {
 				if (typeof value === 'undefined') {
 					value = [];
 				}
 				try {
-					value = parseJson<KoliBriDataType[]>(value);
+					value = parseJson<T[]>(value);
 					// eslint-disable-next-line no-empty
 				} catch (e) {
 					// value behält den ursprünglichen Wert
 				}
-				if (Array.isArray(value) && value.find((dataTupel: KoliBriDataType) => !(typeof dataTupel === 'object' && dataTupel !== null)) === undefined) {
+				if (Array.isArray(value) && value.find((dataTupel: T) => !(typeof dataTupel === 'object' && dataTupel !== null)) === undefined) {
 					setState(this, '_data', value, {
 						afterPatch: () => {
 							// TODO: kein guter Hack (endless loop)
@@ -153,7 +153,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 		});
 	}
 
-	private setSortDirection = (sort: KoliBriSortFunction, direction: KoliBriSortDirection) => {
+	private setSortDirection = (sort: KoliBriSortFunction<T>, direction: KoliBriSortDirection) => {
 		/**
 		 * Durch des Clearen, ist es nicht möglich eine Mehr-Spalten-Sortierung
 		 * darzustellen. Das wäre der Fall, wenn man ggf. Daten in außerhalb der
@@ -171,7 +171,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 	 * @see: components/abbr/component.tsx (@Watch)
 	 */
 	@Watch('_headers')
-	public validateHeaders(value?: Stringified<KoliBriTableHeaders>): void {
+	public validateHeaders(value?: Stringified<KoliBriTableHeaders<T>>): void {
 		/**
 		 * - es darf maximal ein Header als primary markiert werden (last win)
 		 * - der primary-Header entscheidet implizit über _order und _orientation
@@ -185,7 +185,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 		emptyStringByArrayHandler(value, () => {
 			objectObjectHandler(value, () => {
 				try {
-					value = parseJson<KoliBriTableHeaders>(value);
+					value = parseJson<KoliBriTableHeaders<T>>(value);
 					// eslint-disable-next-line no-empty
 				} catch (e) {
 					// value behält den ursprünglichen Wert
@@ -193,7 +193,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 				watchValidator(this, '_headers', (value): boolean => typeof value === 'object' && value !== null, new Set(['KoliBriTableHeaders']), value, {
 					hooks: {
 						beforePatch: (nextValue: unknown) => {
-							const headers: KoliBriTableHeaders = nextValue as KoliBriTableHeaders;
+							const headers: KoliBriTableHeaders<T> = nextValue as KoliBriTableHeaders<T>;
 							headers.horizontal?.forEach((header) => {
 								header.forEach((cell) => {
 									if (typeof cell.sort === 'function' && typeof cell.sortDirection === 'string') {
@@ -291,7 +291,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 		this.validatePagination(this._pagination);
 	}
 
-	private getNumberOfCols(horizontalHeaders: KoliBriTableHeaderCell[][], data: KoliBriDataType[]): number {
+	private getNumberOfCols(horizontalHeaders: KoliBriTableHeaderCell<T>[][], data: T[]): number {
 		let max = 0;
 		horizontalHeaders.forEach((row) => {
 			let count = 0;
@@ -306,7 +306,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 		return max;
 	}
 
-	private getNumberOfRows(verticalHeaders: KoliBriTableHeaderCell[][], data: KoliBriDataType[]): number {
+	private getNumberOfRows(verticalHeaders: KoliBriTableHeaderCell<T>[][], data: T[]): number {
 		let max = 0;
 		verticalHeaders.forEach((col) => {
 			let count = 0;
@@ -322,8 +322,8 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 	}
 
 	// TODO: hier muss noch die order beachtet werden bei colspan und rowspan
-	private filterHeaderKeys(headers: KoliBriTableHeaderCell[][]): KoliBriTableHeaderCell[] {
-		const primaryHeader: KoliBriTableHeaderCell[] = [];
+	private filterHeaderKeys(headers: KoliBriTableHeaderCell<T>[][]): KoliBriTableHeaderCell<T>[] {
+		const primaryHeader: KoliBriTableHeaderCell<T>[] = [];
 		headers.forEach((cells) => {
 			cells.forEach((cell) => {
 				if (typeof cell.key === 'string') {
@@ -334,8 +334,8 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 		return primaryHeader;
 	}
 
-	private getPrimaryHeader(headers: KoliBriTableHeaders): KoliBriTableHeaderCell[] {
-		let primaryHeader: KoliBriTableHeaderCell[] = this.filterHeaderKeys(headers.horizontal ?? []);
+	private getPrimaryHeader(headers: KoliBriTableHeaders<T>): KoliBriTableHeaderCell<T>[] {
+		let primaryHeader: KoliBriTableHeaderCell<T>[] = this.filterHeaderKeys(headers.horizontal ?? []);
 		this.horizontal = true;
 		if (primaryHeader.length === 0) {
 			primaryHeader = this.filterHeaderKeys(headers.vertical ?? []);
@@ -346,13 +346,13 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 		return primaryHeader;
 	}
 
-	private createDataField(data: KoliBriDataType[], headers: KoliBriTableHeaders): KoliBriTableCell[][] {
+	private createDataField(data: T[], headers: KoliBriTableHeaders<T>): KoliBriTableCell<T>[][] {
 		headers.horizontal = Array.isArray(headers?.horizontal) ? headers.horizontal : [];
 		headers.vertical = Array.isArray(headers?.vertical) ? headers.vertical : [];
 		const primaryHeader = this.getPrimaryHeader(headers);
 		const maxCols = this.getNumberOfCols(headers.horizontal, data);
 		const maxRows = this.getNumberOfRows(headers.vertical, data);
-		const dataField: KoliBriTableCell[][] = [];
+		const dataField: KoliBriTableCell<T>[][] = [];
 
 		const rowCount: number[] = [];
 		const rowSpans: number[][] = [];
@@ -362,7 +362,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 		});
 
 		for (let i = 0; i < maxRows; i++) {
-			const dataRow: KoliBriTableHeaderCellAndData[] = [];
+			const dataRow: KoliBriTableHeaderCellAndData<T>[] = [];
 			headers.vertical.forEach((cells, index) => {
 				let sum = 0;
 				rowSpans[index].forEach((value) => (sum += value));
@@ -373,7 +373,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 							...rows,
 							asTd: false,
 							// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-							data: {} as KoliBriDataType,
+							data: {} as T,
 						});
 						let rowSpan = 1;
 						if (typeof rows.rowSpan === 'number' && rows.rowSpan > 1) {
@@ -459,7 +459,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 		return dataField;
 	}
 
-	private selectDisplayedData(data: KoliBriDataType[], pageSize: number, page: number): KoliBriDataType[] {
+	private selectDisplayedData(data: T[], pageSize: number, page: number): T[] {
 		if (typeof pageSize === 'number' && pageSize > 0 && typeof page === 'number' && page > 0) {
 			this.pageStartSlice = pageSize * (page - 1);
 			this.pageEndSlice = pageSize * page > data.length ? data.length : pageSize * page;
@@ -471,7 +471,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 		}
 	}
 
-	private cellRender(col: KoliBriTableHeaderCellAndData, el?: HTMLElement): void {
+	private cellRender(col: KoliBriTableHeaderCellAndData<T>, el?: HTMLElement): void {
 		if (el /* SSR instanceof HTMLElement */) {
 			clearTimeout(CELL_REFS.get(el));
 			CELL_REFS.set(
@@ -486,7 +486,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 								label: col.label,
 								textAlign: col.textAlign,
 								width: col.width,
-							} as KoliBriTableHeaderCell,
+							} as KoliBriTableHeaderCell<T>,
 							col.data,
 							this.state._data
 						);
@@ -500,7 +500,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 	}
 
 	private updateSortedData = () => {
-		let sortedData: KoliBriDataType[] = this.state._data;
+		let sortedData: T[] = this.state._data;
 		if (typeof this.sortFunction === 'function') {
 			switch (this.sortDirections.get(this.sortFunction)) {
 				case 'NOS':
@@ -517,7 +517,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 	};
 
 	public render(): JSX.Element {
-		const displayedData: KoliBriDataType[] = this.selectDisplayedData(
+		const displayedData: T[] = this.selectDisplayedData(
 			this.state._sortedData,
 			this.showPagination ? this.state._pagination?._pageSize ?? 10 : this.state._sortedData.length,
 			this.state._pagination._page || 1
@@ -566,7 +566,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 														ref={
 															typeof col.render === 'function'
 																? (el) => {
-																		this.cellRender(col as KoliBriTableHeaderCellAndData, el);
+																	this.cellRender(col as KoliBriTableHeaderCellAndData<T>, el);
 																  }
 																: undefined
 														}
@@ -751,7 +751,7 @@ export class KolTable implements Generic.Element.ComponentApi<RequiredProps, Opt
 														ref={
 															typeof col.render === 'function'
 																? (el) => {
-																		this.cellRender(col as KoliBriTableHeaderCellAndData, el);
+																	this.cellRender(col as KoliBriTableHeaderCellAndData<T>, el);
 																  }
 																: undefined
 														}
